@@ -84,7 +84,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--stop);outline-o
 .knob::after{content:"";width:34%;aspect-ratio:1;border-radius:50%;background:var(--knob-ink)}
 .pad.grab .knob{transition:none}
 .readout{margin:0;font-size:1.05rem;color:var(--muted);font-variant-numeric:tabular-nums;min-width:12ch;text-align:center}
-.start{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:14px 22px;font-size:1.25rem;z-index:2;background:var(--ok);color:#fff;border-color:var(--line)}
+.start{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:14px 22px;white-space:nowrap;font-size:1.25rem;z-index:2;background:var(--ok);color:#fff;border-color:var(--line)}
 .start:active{transform:translate(-50%,calc(-50% + 3px))}
 
 /* 하단 조작 */
@@ -93,8 +93,9 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns{opacity:.5}
 .speed{display:flex;align-items:center;gap:10px;font-size:1.05rem}
 .speed output{min-width:3.2ch;font-variant-numeric:tabular-nums}
 .speed input{flex:1;accent-color:var(--ink);height:28px}
-.btns{display:grid;grid-template-columns:1fr 1fr 0.7fr;gap:10px}
-.btns button{padding:14px 6px;font-size:1.15rem}
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btns button{padding:12px 6px;font-size:1.15rem}
+.btns .light[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
 .stop{
   padding:16px;font-size:1.5rem;background:var(--stop);color:var(--stop-ink);
   border-color:var(--line);letter-spacing:.08em
@@ -162,6 +163,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns{opacity:.5}
       <button class="toy" id="armUp">팔 올리기</button>
       <button class="toy" id="armDown">팔 내리기</button>
       <button class="toy" id="beep">삐</button>
+      <button class="toy light" id="lightBtn" aria-pressed="false">불 켜기</button>
     </div>
     <button class="toy stop" id="stopBtn">정지</button>
   </section>
@@ -269,7 +271,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns{opacity:.5}
   }
   function onDisconnect() {
     chr = null; running = false; busy = false; slots.clear(); queue.length = 0;
-    resetStick(false);
+    resetStick(false); setLight(false, false);
     log('연결이 끊겼어요');
     setStatus();
   }
@@ -376,6 +378,15 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns{opacity:.5}
   holdButton($('armUp'), () => send('A 60', 'A'), () => send('A 0', 'A'));
   holdButton($('armDown'), () => send('A -60', 'A'), () => send('A 0', 'A'));
   $('beep').addEventListener('click', () => send('B'));
+
+  let lightOn = false;
+  function setLight(on, tell = true) {
+    lightOn = on;
+    $('lightBtn').setAttribute('aria-pressed', on);
+    $('lightBtn').textContent = on ? '불 끄기' : '불 켜기';
+    if (tell) send(on ? 'L 1' : 'L 0');
+  }
+  $('lightBtn').addEventListener('click', () => setLight(!lightOn));
 
   function emergency() {
     resetStick(false); slots.clear(); queue.length = 0; send('S');
