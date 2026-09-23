@@ -65,7 +65,7 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--stop);outline-o
 /* 조이스틱 */
 .stick-area{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:0;position:relative}
 .pad{
-  --size:min(78vw,44vh,330px);
+  --size:min(78vw,40vh,330px);
   width:var(--size);height:var(--size);border-radius:50%;
   border:3px solid var(--line);background:var(--panel);
   position:relative;touch-action:none;flex:none;
@@ -96,6 +96,18 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns{opacity:.5}
 .btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .btns button{padding:12px 6px;font-size:1.15rem}
 .btns .light[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.letters{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center}
+.letters input{
+  min-width:0;font:inherit;font-size:1.2rem;letter-spacing:.12em;text-transform:uppercase;
+  padding:10px 12px;border:3px solid var(--line);border-radius:12px;background:var(--paper);color:var(--ink);
+  -webkit-user-select:text;user-select:text;
+}
+.letters input::placeholder{color:var(--muted);letter-spacing:.05em;text-transform:none}
+.letters .toy{padding:10px 14px;font-size:1.15rem;white-space:nowrap}
+.letters .toy[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.mini{display:grid;grid-template-columns:repeat(5,7px);gap:2px;padding:5px;border:3px solid var(--line);border-radius:10px;background:var(--paper)}
+.mini i{width:7px;height:7px;border-radius:2px;background:color-mix(in srgb,var(--line) 12%,transparent)}
+.mini i.on{background:var(--ink)}
 .stop{
   padding:16px;font-size:1.5rem;background:var(--stop);color:var(--stop-ink);
   border-color:var(--line);letter-spacing:.08em
@@ -165,6 +177,11 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns{opacity:.5}
       <button class="toy" id="beep">삐</button>
       <button class="toy light" id="lightBtn" aria-pressed="false">센서 불 켜기</button>
     </div>
+    <div class="letters">
+      <div class="mini" id="mini" aria-hidden="true"></div>
+      <input id="word" type="text" maxlength="16" placeholder="허브에 띄울 글자" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="허브 화면에 띄울 영어 글자">
+      <button class="toy" id="showWord" aria-pressed="false">보여주기</button>
+    </div>
     <button class="toy stop" id="stopBtn">정지</button>
   </section>
 </div>
@@ -200,6 +217,8 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns{opacity:.5}
     armPower: 60,          // 팔 힘 (1~100)
     sensorLight: 100,      // 컬러센서 조명 밝기 (1~100)
     beep: 'B 880 120',     // 삐 소리: 주파수 길이(ms)
+    letterMs: 700,         // 글자 하나를 보여주는 시간(ms)
+    displayRotate: 0,      // 허브 화면 글자가 누워 보이면 90, 180, 270 으로
   };
 
   const SVC = 'c5f50001-8280-46da-89f4-6d8051e4aeef';
@@ -279,7 +298,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns{opacity:.5}
   }
   function onDisconnect() {
     chr = null; running = false; busy = false; slots.clear(); queue.length = 0;
-    resetStick(false); setLight(false, false);
+    resetStick(false); setLight(false, false); stopWord(false);
     log('연결이 끊겼어요');
     setStatus();
   }
@@ -365,6 +384,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns{opacity:.5}
   const keys = new Set(), ARROWS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
   addEventListener('keydown', e => {
     if (!$('help').hidden) { if (e.key === 'Escape') closeHelp(); return; }
+    if (e.target === $('word')) return;
     if (e.key === ' ') { e.preventDefault(); emergency(); return; }
     if (!ARROWS.includes(e.key) || active !== null) return;
     e.preventDefault(); keys.add(e.key); keyVec();
@@ -403,6 +423,69 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns{opacity:.5}
     if (tell) send(on ? `C ${CONFIG.sensorLight}` : 'C 0');
   }
   $('lightBtn').addEventListener('click', () => setLight(!lightOn));
+
+  // ── 허브 화면 글자 ──
+  const FONT = {
+    A:'.###.#...#######...##...#', B:'####.#...#####.#...#####.', C:'.#####....#....#.....####',
+    D:'####.#...##...##...#####.', E:'######....####.#....#####', F:'######....####.#....#....',
+    G:'.#####....#..###...#.###.', H:'#...##...#######...##...#', I:'#####..#....#....#..#####',
+    J:'..###...#....#.#..#..##..', K:'#..#.#.#..##...#.#..#..#.', L:'#....#....#....#....#####',
+    M:'#...###.###.#.##...##...#', N:'#...###..##.#.##..###...#', O:'.###.#...##...##...#.###.',
+    P:'####.#...#####.#....#....', Q:'.###.#...##.#.##..#..##.#', R:'####.#...#####.#..#.#...#',
+    S:'.#####.....###.....#####.', T:'#####..#....#....#....#..', U:'#...##...##...##...#.###.',
+    V:'#...##...##...#.#.#...#..', W:'#...##...##.#.###.###...#', X:'#...#.#.#...#...#.#.#...#',
+    Y:'#...#.#.#...#....#....#..', Z:'#####...#...#...#...#####',
+    '0':'.###.#..###.#.###..#.###.', '1':'..#...##....#....#...###.', '2':'.###.#...#..##..#...#####',
+    '3':'####.....#.###.....#####.', '4':'#..#.#..#.#####...#....#.', '5':'######....####.....#####.',
+    '6':'.###.#....####.#...#.###.', '7':'#####...#...#...#....#...', '8':'.###.#...#.###.#...#.###.',
+    '9':'.###.#...#.####....#.###.', ' ':'.........................', '!':'..#....#....#.........#..',
+    '?':'.###.#...#..##........#..', '♥':'.#.#.##########.###...#..', '-':'..........#####..........'
+  };
+  const BLANK = FONT[' '];
+  const mini = $('mini');
+  for (let i = 0; i < 25; i++) mini.appendChild(document.createElement('i'));
+  function rotate(pat, deg) {
+    let g = pat;
+    for (let k = 0; k < ((deg / 90) % 4 + 4) % 4; k++) {
+      let n = '';
+      for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) n += g[(4 - c) * 5 + r];
+      g = n;
+    }
+    return g;
+  }
+  function showPattern(pat) {
+    [...mini.children].forEach((el, i) => el.classList.toggle('on', pat[i] === '#'));
+    if (pat === BLANK) send('X 0', 'X');
+    else send('X ' + rotate(pat, CONFIG.displayRotate).replace(/#/g, '9').replace(/\./g, '0'), 'X');
+  }
+  let wordTimer = null;
+  function stopWord(clear = true) {
+    clearTimeout(wordTimer); wordTimer = null;
+    $('showWord').setAttribute('aria-pressed', 'false'); $('showWord').textContent = '보여주기';
+    if (clear) showPattern(BLANK);
+  }
+  function playWord() {
+    const raw = $('word').value.toUpperCase();
+    const chars = [...raw].filter(ch => FONT[ch]);
+    if (!chars.length) { log('영어 알파벳, 숫자, ! ? - ♥ 만 띄울 수 있어요'); $('word').focus(); return; }
+    if (chars.length < [...raw].length) log('못 띄우는 글자는 건너뛰었어요');
+    $('showWord').setAttribute('aria-pressed', 'true'); $('showWord').textContent = '멈추기';
+    let i = 0;
+    const step = () => {
+      const ch = chars[i % chars.length];
+      showPattern(FONT[ch]);
+      i++;
+      const endOfWord = i % chars.length === 0;
+      wordTimer = setTimeout(() => {
+        // 같은 글자가 이어지거나 한 바퀴가 끝나면 잠깐 비워서 구분
+        if (endOfWord || chars[i % chars.length] === ch) { showPattern(BLANK); wordTimer = setTimeout(step, endOfWord ? 500 : 150); }
+        else step();
+      }, CONFIG.letterMs);
+    };
+    step();
+  }
+  $('showWord').addEventListener('click', () => { wordTimer ? stopWord() : playWord(); });
+  $('word').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('word').blur(); if (!wordTimer) playWord(); } });
 
   function emergency() {
     resetStick(false); slots.clear(); queue.length = 0; send('S');
