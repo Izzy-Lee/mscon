@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>마인드스톰 리모컨</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Do+Hyeon&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F7D3DE; --panel:#FCEAF0; --ink:#000; --paper:#fff; --line:#000;
+  --muted:#7a5561; --ok:#1F9D55; --warn:#D98A00; --stop:#E0312B; --stop-ink:#fff;
+  --knob:#000; --knob-ink:#F7D3DE;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#1B1417; --panel:#271D21; --ink:#F7D3DE; --paper:#120D0F; --line:#F7D3DE;
+    --muted:#b8959f; --knob:#F7D3DE; --knob-ink:#000;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1B1417; --panel:#271D21; --ink:#F7D3DE; --paper:#120D0F; --line:#F7D3DE;
+  --muted:#b8959f; --knob:#F7D3DE; --knob-ink:#000;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{height:100%;background:var(--bg);scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0;height:100%;background:var(--bg);color:var(--ink);
+  font-family:"Do Hyeon","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  -webkit-tap-highlight-color:transparent;overflow:hidden;
+}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:3px solid var(--stop);outline-offset:3px}
+
+.app{
+  height:100%;max-width:560px;margin:0 auto;
+  display:grid;grid-template-rows:auto 1fr auto;gap:10px;
+  padding:12px max(14px,env(safe-area-inset-right,0px)) 14px max(14px,env(safe-area-inset-left,0px));
+}
+
+/* 상단 */
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.top h1{margin:0;font-size:1.55rem;font-weight:400;letter-spacing:-.01em;line-height:1.1}
+.status{margin:4px 0 0;display:flex;align-items:center;gap:6px;font-size:.95rem;color:var(--muted)}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex:none}
+.dot[data-s="wait"]{background:var(--warn)}
+.dot[data-s="on"]{background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 25%,transparent)}
+.top-actions{display:flex;gap:8px;align-items:center}
+
+.toy{
+  border:3px solid var(--line);background:var(--paper);border-radius:14px;
+  box-shadow:0 4px 0 var(--line);transition:transform .06s,box-shadow .06s;
+  touch-action:none;
+}
+.toy:active,.toy.down{transform:translateY(3px);box-shadow:0 1px 0 var(--line)}
+.pill{padding:9px 16px;font-size:1.1rem;background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.round{width:44px;height:44px;border-radius:50%;font-size:1.3rem;padding:0}
+
+/* 조이스틱 */
+.stick-area{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:0;position:relative}
+.pad{
+  --size:min(78vw,44vh,330px);
+  width:var(--size);height:var(--size);border-radius:50%;
+  border:3px solid var(--line);background:var(--panel);
+  position:relative;touch-action:none;flex:none;
+}
+.pad::before,.pad::after{content:"";position:absolute;background:var(--line);opacity:.15}
+.pad::before{left:50%;top:10%;bottom:10%;width:2px;transform:translateX(-50%)}
+.pad::after{top:50%;left:10%;right:10%;height:2px;transform:translateY(-50%)}
+.stud{position:absolute;width:9%;aspect-ratio:1;border-radius:50%;border:3px solid var(--line);background:var(--paper);transform:translate(-50%,-50%)}
+.stud.n{left:50%;top:8%}.stud.s{left:50%;top:92%}.stud.w{left:8%;top:50%}.stud.e{left:92%;top:50%}
+.knob{
+  position:absolute;left:50%;top:50%;width:36%;aspect-ratio:1;border-radius:50%;
+  background:var(--knob);transform:translate(-50%,-50%);
+  box-shadow:0 5px 0 color-mix(in srgb,var(--line) 35%,transparent);
+  display:grid;place-items:center;transition:transform .18s cubic-bezier(.3,1.6,.5,1);
+}
+.knob::after{content:"";width:34%;aspect-ratio:1;border-radius:50%;background:var(--knob-ink)}
+.pad.grab .knob{transition:none}
+.readout{margin:0;font-size:1.05rem;color:var(--muted);font-variant-numeric:tabular-nums;min-width:12ch;text-align:center}
+.start{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);padding:14px 22px;font-size:1.25rem;z-index:2;background:var(--ok);color:#fff;border-color:var(--line)}
+.start:active{transform:translate(-50%,calc(-50% + 3px))}
+
+/* 하단 조작 */
+.controls{display:grid;gap:10px;transition:opacity .2s}
+body:not(.live) .stick-area .pad,body:not(.live) .controls .btns{opacity:.5}
+.speed{display:flex;align-items:center;gap:10px;font-size:1.05rem}
+.speed output{min-width:3.2ch;font-variant-numeric:tabular-nums}
+.speed input{flex:1;accent-color:var(--ink);height:28px}
+.btns{display:grid;grid-template-columns:1fr 1fr 0.7fr;gap:10px}
+.btns button{padding:14px 6px;font-size:1.15rem}
+.stop{
+  padding:16px;font-size:1.5rem;background:var(--stop);color:var(--stop-ink);
+  border-color:var(--line);letter-spacing:.08em
+}
+
+/* 가로 모드: 왼손 조이스틱, 오른손 버튼 */
+@media (orientation:landscape) and (max-height:540px){
+  .app{max-width:none;grid-template-columns:1fr 1fr;grid-template-rows:auto 1fr;column-gap:24px}
+  .top{grid-column:1 / -1}
+  .pad{--size:min(62vh,300px)}
+  .controls{align-content:center}
+}
+
+/* 도움말 */
+.sheet{
+  position:fixed;inset:0;z-index:10;background:var(--bg);overflow:auto;
+  padding:calc(env(safe-area-inset-top,0px) + 18px) max(20px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 24px) max(20px,env(safe-area-inset-left,0px));
+  -webkit-user-select:text;user-select:text;
+}
+.sheet[hidden]{display:none}
+.sheet-inner{max-width:520px;margin:0 auto}
+.sheet h2{font-weight:400;font-size:1.6rem;margin:0 0 14px}
+.sheet ol{margin:0;padding-left:1.4em;font-family:"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;font-size:.98rem;line-height:1.65}
+.sheet li{margin-bottom:12px}
+.sheet li b{font-family:"Do Hyeon","Apple SD Gothic Neo",sans-serif;font-weight:400;font-size:1.12rem;display:block}
+.sheet code{background:var(--panel);border:1px solid color-mix(in srgb,var(--line) 25%,transparent);padding:1px 5px;border-radius:5px;font-size:.9em}
+.notice{border:3px solid var(--stop);background:var(--panel);border-radius:14px;padding:12px 14px;margin:0 0 16px;font-family:"Apple SD Gothic Neo",system-ui,sans-serif;line-height:1.55}
+.notice[hidden]{display:none}
+.row{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+.row .toy{padding:10px 16px;font-size:1.1rem}
+.logbox{margin-top:18px}
+.logbox h3{font-weight:400;font-size:1.15rem;margin:0 0 6px}
+#log{font-family:"Apple SD Gothic Neo",system-ui,sans-serif;font-size:.85rem;line-height:1.5;color:var(--muted);max-height:160px;overflow:auto;background:var(--panel);border-radius:10px;padding:8px 10px;min-height:2.5em}
+
+@media (prefers-reduced-motion:reduce){.knob,.toy{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>마인드스톰 리모컨</h1>
+      <p class="status" aria-live="polite"><span class="dot" id="dot" data-s="off"></span><span id="statusText">연결 안 됨</span></p>
+    </div>
+    <div class="top-actions">
+      <button class="toy round" id="helpBtn" aria-label="사용 방법">?</button>
+      <button class="toy pill" id="connectBtn">허브 연결</button>
+    </div>
+  </header>
+
+  <main class="stick-area">
+    <div class="pad" id="pad" role="application" aria-label="주행 조이스틱. 키보드 방향키로도 조종할 수 있어요">
+      <span class="stud n"></span><span class="stud s"></span><span class="stud w"></span><span class="stud e"></span>
+      <div class="knob" id="knob"></div>
+    </div>
+    <p class="readout" id="readout">앞뒤 0 좌우 0</p>
+    <button class="toy start" id="startBtn" hidden>허브 프로그램 시작</button>
+  </main>
+
+  <section class="controls" aria-label="조작 버튼">
+    <label class="speed">최대 속도 <output id="spdOut">70%</output>
+      <input type="range" id="spd" min="20" max="100" step="10" value="70">
+    </label>
+    <div class="btns">
+      <button class="toy" id="armUp">팔 올리기</button>
+      <button class="toy" id="armDown">팔 내리기</button>
+      <button class="toy" id="beep">삐</button>
+    </div>
+    <button class="toy stop" id="stopBtn">정지</button>
+  </section>
+</div>
+
+<div class="sheet" id="help" hidden role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+  <div class="sheet-inner">
+    <p class="notice" id="noBt" hidden>
+      지금 브라우저는 블루투스 연결을 지원하지 않아요. 아이폰의 사파리와 크롬은 모두 막혀 있으니, 앱스토어에서 <b>Bluefy</b>를 설치하고 이 주소를 Bluefy에서 열어 주세요.
+    </p>
+    <h2 id="helpTitle">처음 쓰는 방법</h2>
+    <ol>
+      <li><b>허브에 Pybricks 펌웨어 설치</b>컴퓨터 크롬에서 <code>code.pybricks.com</code>에 들어가 설정 메뉴의 펌웨어 설치를 따라 하세요. 나중에 레고 공식 앱 펌웨어로 되돌릴 수 있어요.</li>
+      <li><b>허브 프로그램 올리기</b><code>mindstorm_remote.py</code> 내용을 붙여넣고 허브로 실행하면 허브에 저장돼요. 포트는 A 왼쪽 바퀴, B 오른쪽 바퀴, C 팔이에요. 다 올렸으면 컴퓨터와의 연결을 끊어 주세요. 허브는 한 번에 한 기기와만 연결돼요.</li>
+      <li><b>아이폰에서 Bluefy로 이 페이지 열기</b>Bluefy는 블루투스를 쓸 수 있는 iOS 브라우저예요.</li>
+      <li><b>허브 켜고 연결하기</b>허브 연결을 눌러 목록에서 허브를 고른 뒤, 허브 프로그램 시작을 누르거나 허브의 가운데 버튼을 누르세요. 상태가 조종 가능으로 바뀌면 준비 끝이에요.</li>
+    </ol>
+    <div class="row">
+      <button class="toy" id="copyUrl">이 주소 복사</button>
+      <button class="toy pill" id="closeHelp">닫기</button>
+    </div>
+    <div class="logbox">
+      <h3>허브 메시지</h3>
+      <div id="log" aria-live="polite"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const SVC = 'c5f50001-8280-46da-89f4-6d8051e4aeef';
+  const CHR = 'c5f50002-8280-46da-89f4-6d8051e4aeef';
+  const $ = id => document.getElementById(id);
+  const enc = new TextEncoder(), dec = new TextDecoder();
+  const hasBt = !!(navigator.bluetooth && navigator.bluetooth.requestDevice);
+
+  let device = null, chr = null, running = false, battWarned = false;
+  const slots = new Map();   // 최신 값만 보내면 되는 명령 (주행, 팔)
+  const queue = [];          // 한 번씩 꼭 보내야 하는 명령
+  let busy = false;
+
+  function log(msg) {
+    const el = $('log'), line = document.createElement('div');
+    const t = new Date().toTimeString().slice(0, 8);
+    line.textContent = t + '  ' + msg;
+    el.prepend(line);
+    while (el.childNodes.length > 60) el.lastChild.remove();
+  }
+
+  function setStatus(text) {
+    const d = $('dot'), s = $('statusText');
+    if (!chr) { d.dataset.s = 'off'; s.textContent = text || '연결 안 됨'; $('connectBtn').textContent = '허브 연결'; $('startBtn').hidden = true; }
+    else if (running) { d.dataset.s = 'on'; s.textContent = '조종 가능'; $('connectBtn').textContent = '연결 끊기'; $('startBtn').hidden = true; }
+    else { d.dataset.s = 'wait'; s.textContent = '허브 프로그램 대기 중'; $('connectBtn').textContent = '연결 끊기'; $('startBtn').hidden = false; }
+    document.body.classList.toggle('live', !!chr && running);
+  }
+
+  function write(bytes) {
+    return chr.writeValueWithResponse ? chr.writeValueWithResponse(bytes) : chr.writeValue(bytes);
+  }
+  async function pump() {
+    if (busy || !chr) return;
+    busy = true;
+    try {
+      while (chr && (queue.length || slots.size)) {
+        let b;
+        if (queue.length) b = queue.shift();
+        else { const [k, v] = slots.entries().next().value; slots.delete(k); b = v; }
+        await write(b);
+      }
+    } catch (e) { log('전송 실패: ' + e.message); }
+    finally { busy = false; }
+  }
+  function send(text, slot) {
+    if (!chr) return;
+    const body = enc.encode(text + '\n');
+    const b = new Uint8Array(body.length + 1);
+    b[0] = 0x06; b.set(body, 1);           // Pybricks: stdin 쓰기
+    if (slot) slots.set(slot, b); else queue.push(b);
+    pump();
+  }
+
+  // ── 연결 ──
+  async function connect() {
+    if (!hasBt) { openHelp(); return; }
+    try {
+      device = await navigator.bluetooth.requestDevice({ filters: [{ services: [SVC] }] });
+      device.addEventListener('gattserverdisconnected', onDisconnect);
+      setStatus('연결 중');
+      const server = await device.gatt.connect();
+      const svc = await server.getPrimaryService(SVC);
+      const c = await svc.getCharacteristic(CHR);
+      c.addEventListener('characteristicvaluechanged', onNotify);
+      await c.startNotifications();
+      chr = c;
+      log((device.name || '허브') + ' 연결됨');
+      setStatus();
+    } catch (e) {
+      chr = null;
+      if (e.name === 'NotFoundError') { setStatus(); return; }
+      if (e.name === 'SecurityError') { log('이 화면에서는 블루투스 사용이 막혀 있어요. 페이지 주소를 Bluefy에서 직접 열어 주세요.'); openHelp(); }
+      else log('연결 실패: ' + e.message);
+      setStatus();
+    }
+  }
+  function onDisconnect() {
+    chr = null; running = false; busy = false; slots.clear(); queue.length = 0;
+    resetStick(false);
+    log('연결이 끊겼어요');
+    setStatus();
+  }
+  function onNotify(e) {
+    const v = e.target.value, type = v.getUint8(0);
+    if (type === 0x00 && v.byteLength >= 5) {           // 상태 보고
+      const flags = v.getUint32(1, true);
+      const r = !!(flags & (1 << 6));
+      if (r !== running) { running = r; if (!r) resetStick(false); setStatus(); log(r ? '허브 프로그램 실행 중' : '허브 프로그램 멈춤'); }
+      if ((flags & 1) && !battWarned) { battWarned = true; log('허브 배터리가 부족해요'); }
+    } else if (type === 0x01) {                          // 허브 print 출력
+      const text = dec.decode(new Uint8Array(v.buffer, v.byteOffset + 1, v.byteLength - 1));
+      text.split('\n').forEach(l => { if (l.trim()) log('허브: ' + l.trim()); });
+    }
+  }
+  async function startProgram() {
+    if (!chr) return;
+    try { await write(new Uint8Array([0x01])); }
+    catch (e) {
+      try { await write(new Uint8Array([0x01, 0x00])); }
+      catch (e2) { log('시작하지 못했어요. 허브의 가운데 버튼을 눌러 주세요.'); }
+    }
+  }
+
+  $('connectBtn').addEventListener('click', async () => {
+    if (chr && device) { emergency(); setTimeout(() => device.gatt.disconnect(), 150); }
+    else connect();
+  });
+  $('startBtn').addEventListener('click', startProgram);
+
+  // ── 조이스틱 ──
+  const pad = $('pad'), knob = $('knob');
+  let active = null, vec = { x: 0, y: 0 }, timer = null;
+
+  function moveKnob(nx, ny) {
+    const R = pad.getBoundingClientRect().width / 2 * 0.72;
+    knob.style.transform = `translate(-50%,-50%) translate(${nx * R}px,${ny * R}px)`;
+  }
+  function padMove(e) {
+    const r = pad.getBoundingClientRect();
+    const R = r.width / 2 * 0.72;
+    let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+    const d = Math.hypot(dx, dy);
+    if (d > R) { dx *= R / d; dy *= R / d; }
+    vec = { x: dx / R, y: dy / R };
+    moveKnob(vec.x, vec.y);
+  }
+  function calc() {
+    const max = +$('spd').value;
+    const dz = n => Math.abs(n) < 0.1 ? 0 : n;
+    const s = Math.round(-dz(vec.y) * max);
+    const t = Math.round(dz(vec.x) * max * 0.6);
+    return [s + 0, t + 0];
+  }
+  function readout(s, t) { $('readout').textContent = `앞뒤 ${s} 좌우 ${t}`; }
+  function sendDrive() { const [s, t] = calc(); readout(s, t); send(`D ${s} ${t}`, 'D'); }
+  function startLoop() { if (!timer) { sendDrive(); timer = setInterval(sendDrive, 80); } }
+  function resetStick(tell = true) {
+    active = null; clearInterval(timer); timer = null;
+    vec = { x: 0, y: 0 }; knob.style.transform = 'translate(-50%,-50%)';
+    pad.classList.remove('grab'); readout(0, 0);
+    if (tell) send('D 0 0', 'D');
+  }
+
+  pad.addEventListener('pointerdown', e => {
+    if (active !== null) return;
+    active = e.pointerId; pad.setPointerCapture(active); pad.classList.add('grab');
+    padMove(e); startLoop();
+  });
+  pad.addEventListener('pointermove', e => { if (e.pointerId === active) padMove(e); });
+  const padEnd = e => { if (e.pointerId === active) resetStick(); };
+  pad.addEventListener('pointerup', padEnd);
+  pad.addEventListener('pointercancel', padEnd);
+
+  // 방향키 (컴퓨터에서 테스트할 때)
+  const keys = new Set(), ARROWS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+  addEventListener('keydown', e => {
+    if (!$('help').hidden) { if (e.key === 'Escape') closeHelp(); return; }
+    if (e.key === ' ') { e.preventDefault(); emergency(); return; }
+    if (!ARROWS.includes(e.key) || active !== null) return;
+    e.preventDefault(); keys.add(e.key); keyVec();
+  });
+  addEventListener('keyup', e => { if (keys.delete(e.key)) keyVec(); });
+  function keyVec() {
+    if (!keys.size) { if (timer && active === null) resetStick(); return; }
+    let x = keys.has('ArrowRight') - keys.has('ArrowLeft'), y = keys.has('ArrowDown') - keys.has('ArrowUp');
+    const d = Math.hypot(x, y) || 1; vec = { x: x / d, y: y / d };
+    moveKnob(vec.x, vec.y); startLoop();
+  }
+
+  // ── 버튼 ──
+  function holdButton(el, tick, end) {
+    let t = null, id = null;
+    el.addEventListener('pointerdown', e => {
+      if (id !== null) return;
+      id = e.pointerId; el.setPointerCapture(id); el.classList.add('down');
+      tick(); t = setInterval(tick, 150);
+    });
+    const stop = e => { if (e.pointerId !== id) return; id = null; clearInterval(t); el.classList.remove('down'); end(); };
+    el.addEventListener('pointerup', stop);
+    el.addEventListener('pointercancel', stop);
+    el.addEventListener('contextmenu', e => e.preventDefault());
+  }
+  holdButton($('armUp'), () => send('A 60', 'A'), () => send('A 0', 'A'));
+  holdButton($('armDown'), () => send('A -60', 'A'), () => send('A 0', 'A'));
+  $('beep').addEventListener('click', () => send('B'));
+
+  function emergency() {
+    resetStick(false); slots.clear(); queue.length = 0; send('S');
+  }
+  $('stopBtn').addEventListener('click', emergency);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) emergency(); });
+  addEventListener('blur', () => { if (timer) emergency(); });
+
+  $('spd').addEventListener('input', e => { $('spdOut').textContent = e.target.value + '%'; });
+
+  // ── 도움말 ──
+  function openHelp() { $('noBt').hidden = hasBt; $('help').hidden = false; $('closeHelp').focus(); }
+  function closeHelp() { $('help').hidden = true; $('helpBtn').focus(); }
+  $('helpBtn').addEventListener('click', openHelp);
+  $('closeHelp').addEventListener('click', closeHelp);
+  $('copyUrl').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(location.href); $('copyUrl').textContent = '주소 복사됨'; }
+    catch (e) { $('copyUrl').textContent = '복사 안 됨, 주소창에서 복사해 주세요'; }
+    setTimeout(() => { $('copyUrl').textContent = '이 주소 복사'; }, 2200);
+  });
+
+  if (!hasBt) { log('이 브라우저는 블루투스를 지원하지 않아요'); openHelp(); }
+  setStatus();
+})();
+</script>
+</body>
+</html>
