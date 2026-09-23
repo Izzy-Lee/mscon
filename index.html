@@ -163,7 +163,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns{opacity:.5}
       <button class="toy" id="armUp">팔 올리기</button>
       <button class="toy" id="armDown">팔 내리기</button>
       <button class="toy" id="beep">삐</button>
-      <button class="toy light" id="lightBtn" aria-pressed="false">불 켜기</button>
+      <button class="toy light" id="lightBtn" aria-pressed="false">센서 불 켜기</button>
     </div>
     <button class="toy stop" id="stopBtn">정지</button>
   </section>
@@ -177,7 +177,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns{opacity:.5}
     <h2 id="helpTitle">처음 쓰는 방법</h2>
     <ol>
       <li><b>허브에 Pybricks 펌웨어 설치</b>컴퓨터 크롬에서 <code>code.pybricks.com</code>에 들어가 설정 메뉴의 펌웨어 설치를 따라 하세요. 나중에 레고 공식 앱 펌웨어로 되돌릴 수 있어요.</li>
-      <li><b>허브 프로그램 올리기</b><code>mindstorm_remote.py</code> 내용을 붙여넣고 허브로 실행하면 허브에 저장돼요. 포트는 A 왼쪽 바퀴, B 오른쪽 바퀴, C 팔이에요. 다 올렸으면 컴퓨터와의 연결을 끊어 주세요. 허브는 한 번에 한 기기와만 연결돼요.</li>
+      <li><b>허브 프로그램 올리기</b><code>mindstorm_remote.py</code>를 가져와 허브로 실행하면 허브에 저장돼요. A 왼쪽 바퀴, B 오른쪽 바퀴이고, 나머지 포트의 모터와 센서는 허브가 스스로 찾아요. 다 올렸으면 컴퓨터와의 연결을 끊어 주세요. 허브는 한 번에 한 기기와만 연결돼요.</li>
       <li><b>아이폰에서 Bluefy로 이 페이지 열기</b>Bluefy는 블루투스를 쓸 수 있는 iOS 브라우저예요.</li>
       <li><b>허브 켜고 연결하기</b>허브 연결을 눌러 목록에서 허브를 고른 뒤, 허브 프로그램 시작을 누르거나 허브의 가운데 버튼을 누르세요. 상태가 조종 가능으로 바뀌면 준비 끝이에요.</li>
     </ol>
@@ -194,6 +194,14 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns{opacity:.5}
 
 <script>
 (() => {
+  // ── 여기만 바꾸면 버튼 동작이 바뀌어요 (허브 코드는 그대로) ──
+  const CONFIG = {
+    armPort: 'C',          // 팔 모터가 꽂힌 포트
+    armPower: 60,          // 팔 힘 (1~100)
+    sensorLight: 100,      // 컬러센서 조명 밝기 (1~100)
+    beep: 'B 880 120',     // 삐 소리: 주파수 길이(ms)
+  };
+
   const SVC = 'c5f50001-8280-46da-89f4-6d8051e4aeef';
   const CHR = 'c5f50002-8280-46da-89f4-6d8051e4aeef';
   const $ = id => document.getElementById(id);
@@ -284,7 +292,14 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns{opacity:.5}
       if ((flags & 1) && !battWarned) { battWarned = true; log('허브 배터리가 부족해요'); }
     } else if (type === 0x01) {                          // 허브 print 출력
       const text = dec.decode(new Uint8Array(v.buffer, v.byteOffset + 1, v.byteLength - 1));
-      text.split('\n').forEach(l => { if (l.trim()) log('허브: ' + l.trim()); });
+      text.split('\n').forEach(l => {
+        l = l.trim(); if (!l) return;
+        if (l.startsWith('DEV')) {
+          const names = { wheel: '바퀴', motor: '모터', color: '컬러센서', distance: '거리센서' };
+          const parts = l.slice(3).trim().split(' ').filter(Boolean).map(x => { const [pt, k] = x.split(':'); return pt + ' ' + (names[k] || k); });
+          log('찾은 부품: ' + (parts.join(', ') || '없음'));
+        } else log('허브: ' + l);
+      });
     }
   }
   async function startProgram() {
@@ -375,16 +390,17 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns{opacity:.5}
     el.addEventListener('pointercancel', stop);
     el.addEventListener('contextmenu', e => e.preventDefault());
   }
-  holdButton($('armUp'), () => send('A 60', 'A'), () => send('A 0', 'A'));
-  holdButton($('armDown'), () => send('A -60', 'A'), () => send('A 0', 'A'));
-  $('beep').addEventListener('click', () => send('B'));
+  const arm = v => send(`P ${CONFIG.armPort} ${v}`, 'A');
+  holdButton($('armUp'), () => arm(CONFIG.armPower), () => arm(0));
+  holdButton($('armDown'), () => arm(-CONFIG.armPower), () => arm(0));
+  $('beep').addEventListener('click', () => send(CONFIG.beep));
 
   let lightOn = false;
   function setLight(on, tell = true) {
     lightOn = on;
     $('lightBtn').setAttribute('aria-pressed', on);
-    $('lightBtn').textContent = on ? '불 끄기' : '불 켜기';
-    if (tell) send(on ? 'L 1' : 'L 0');
+    $('lightBtn').textContent = on ? '센서 불 끄기' : '센서 불 켜기';
+    if (tell) send(on ? `C ${CONFIG.sensorLight}` : 'C 0');
   }
   $('lightBtn').addEventListener('click', () => setLight(!lightOn));
 
