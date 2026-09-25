@@ -41,8 +41,8 @@ button:focus-visible,input:focus-visible{outline:3px solid var(--stop);outline-o
 .app{
   height:100%;max-width:560px;margin:0 auto;
   display:grid;gap:10px;
-  grid-template-rows:auto auto minmax(0,1fr) auto;
-  grid-template-areas:"top" "letters" "stick" "controls";
+  grid-template-rows:auto auto auto minmax(0,1fr) auto;
+  grid-template-areas:"top" "mode" "letters" "stick" "controls";
   padding:12px max(14px,env(safe-area-inset-right,0px)) 14px max(14px,env(safe-area-inset-left,0px));
 }
 
@@ -100,6 +100,22 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
 .btns.three{grid-template-columns:0.8fr 1.3fr 1fr}
 .btns button{padding:11px 4px;font-size:1.1rem;white-space:nowrap}
 .btns .light[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.modebar{grid-area:mode;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.seg{display:inline-flex;border:3px solid var(--line);border-radius:12px;overflow:hidden;background:var(--paper)}
+.seg button{border:0;background:transparent;padding:8px 16px;font-size:1.1rem;white-space:nowrap}
+.seg button[aria-selected="true"]{background:var(--ink);color:var(--bg)}
+.modebar .toy{padding:8px 14px;font-size:1.05rem;white-space:nowrap}
+.modebar .toy[hidden]{display:none}
+.form{display:grid;gap:16px;font-family:"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif}
+.field{display:grid;gap:6px;font-family:"Do Hyeon","Apple SD Gothic Neo",sans-serif;font-size:1.15rem}
+.field select{font:inherit;font-size:1.1rem;padding:8px 10px;border:3px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink)}
+.field input[type=range]{accent-color:var(--ink);width:100%}
+.check{display:flex;align-items:center;gap:10px;font-size:1rem;margin-top:-8px}
+.check input{width:22px;height:22px;accent-color:var(--ink)}
+.hint{font-family:"Apple SD Gothic Neo",system-ui,sans-serif;font-size:.9rem;color:var(--muted)}
+.trim{display:flex;align-items:center;gap:14px}
+.trim .toy{width:56px;height:48px;font-size:1.2rem;padding:0}
+.trim output{min-width:4ch;text-align:center;font-size:1.3rem;font-variant-numeric:tabular-nums}
 .letters{grid-area:letters;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center}
 .letters input{
   min-width:0;font:inherit;font-size:1.2rem;letter-spacing:.12em;text-transform:uppercase;
@@ -120,8 +136,8 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
 /* 가로 모드: 왼손 조이스틱, 오른손 버튼 */
 @media (orientation:landscape) and (max-height:540px){
   .app{max-width:none;grid-template-columns:1fr 1fr;column-gap:24px;
-    grid-template-rows:auto auto minmax(0,1fr);
-    grid-template-areas:"top top" "stick letters" "stick controls"}
+    grid-template-rows:auto auto auto minmax(0,1fr);
+    grid-template-areas:"top top" "stick mode" "stick letters" "stick controls"}
   .controls{align-content:start}
 }
 
@@ -162,6 +178,14 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
     </div>
   </header>
 
+  <div class="modebar">
+    <div class="seg" role="tablist" aria-label="로봇 종류">
+      <button role="tab" id="tabTank" aria-selected="true">탱크형</button>
+      <button role="tab" id="tabCar" aria-selected="false">자동차형</button>
+    </div>
+    <button class="toy" id="carSetBtn" hidden>차 설정</button>
+  </div>
+
   <div class="letters">
     <div class="mini" id="mini" aria-hidden="true"></div>
     <input id="word" type="text" maxlength="16" placeholder="영어 글자" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="허브 화면에 띄울 영어 글자">
@@ -191,6 +215,25 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
       <button class="toy stop" id="stopBtn">정지</button>
     </div>
   </section>
+</div>
+
+<div class="sheet" id="carSheet" hidden role="dialog" aria-modal="true" aria-labelledby="carTitle">
+  <div class="sheet-inner">
+    <h2 id="carTitle">자동차 설정</h2>
+    <div class="form">
+      <label class="field">구동 모터 (바퀴 굴리기) 포트<select id="carDrive"></select></label>
+      <label class="check"><input type="checkbox" id="carDriveRev"> 앞뒤가 반대로 가요</label>
+      <label class="field">핸들 모터 (방향 꺾기) 포트<select id="carSteer"></select></label>
+      <label class="check"><input type="checkbox" id="carSteerRev"> 좌우가 반대로 꺾여요</label>
+      <label class="field"><span>핸들 최대 각도 <output id="carMaxOut">35°</output></span><input type="range" id="carMax" min="10" max="90" step="5"></label>
+      <div class="field">핸들 가운데 맞추기
+        <span class="hint">허브를 연결하고 조종 가능 상태에서, 앞바퀴가 똑바로 설 때까지 눌러 주세요. 한 번 맞추면 기억해요.</span>
+        <div class="trim"><button class="toy" id="trimL" aria-label="핸들 왼쪽으로 조금">◀</button><output id="trimOut">0°</output><button class="toy" id="trimR" aria-label="핸들 오른쪽으로 조금">▶</button></div>
+      </div>
+    </div>
+    <p class="hint" style="margin-top:18px">어느 포트에 모터가 있는지는 ? 화면의 허브 메시지 "찾은 부품"에서 볼 수 있어요.</p>
+    <div class="row"><button class="toy pill" id="closeCar">닫기</button></div>
+  </div>
 </div>
 
 <div class="sheet" id="help" hidden role="dialog" aria-modal="true" aria-labelledby="helpTitle">
@@ -314,7 +357,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
     if (type === 0x00 && v.byteLength >= 5) {           // 상태 보고
       const flags = v.getUint32(1, true);
       const r = !!(flags & (1 << 6));
-      if (r !== running) { running = r; if (!r) resetStick(false); setStatus(); log(r ? '허브 프로그램 실행 중' : '허브 프로그램 멈춤'); }
+      if (r !== running) { running = r; if (!r) resetStick(false); else if (mode === 'car') steerTo(0, true); setStatus(); log(r ? '허브 프로그램 실행 중' : '허브 프로그램 멈춤'); }
       if ((flags & 1) && !battWarned) { battWarned = true; log('허브 배터리가 부족해요'); }
     } else if (type === 0x01) {                          // 허브 print 출력
       const text = dec.decode(new Uint8Array(v.buffer, v.byteOffset + 1, v.byteLength - 1));
@@ -360,21 +403,45 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
     vec = { x: dx / R, y: dy / R };
     moveKnob(vec.x, vec.y);
   }
+  const dz = n => Math.abs(n) < 0.1 ? 0 : n;
   function calc() {
     const max = +$('spd').value;
-    const dz = n => Math.abs(n) < 0.1 ? 0 : n;
     const s = Math.round(-dz(vec.y) * max);
     const t = Math.round(dz(vec.x) * max * 0.6);
     return [s + 0, t + 0];
   }
   function readout(s, t) { $('readout').textContent = `앞뒤 ${s} 좌우 ${t}`; }
-  function sendDrive() { const [s, t] = calc(); readout(s, t); send(`D ${s} ${t}`, 'D'); }
+  // ── 자동차형 ──
+  const CAR_DEFAULT = { drive: 'A', driveRev: false, steer: 'B', steerRev: false, maxAngle: 35, trim: 0 };
+  let mode = 'tank', car = { ...CAR_DEFAULT }, lastSteer = null;
+  try {
+    const m = localStorage.getItem('mr-mode'); if (m === 'car' || m === 'tank') mode = m;
+    const c = JSON.parse(localStorage.getItem('mr-car') || 'null'); if (c) car = { ...CAR_DEFAULT, ...c };
+  } catch (e) {}
+  function saveCar() { try { localStorage.setItem('mr-car', JSON.stringify(car)); localStorage.setItem('mr-mode', mode); } catch (e) {} }
+  function steerTo(deg, force = false) {
+    const t = Math.round(car.trim + (car.steerRev ? -deg : deg));
+    if (t === lastSteer && !force) return;
+    lastSteer = t; send(`T ${car.steer} ${t}`, 'T');
+  }
+  function sendDrive() {
+    const [s, t] = calc();
+    if (mode === 'car') {
+      const deg = Math.round(dz(vec.x) * car.maxAngle);
+      $('readout').textContent = `속도 ${s} 핸들 ${deg}°`;
+      send(`P ${car.drive} ${car.driveRev ? -s : s}`, 'D');
+      steerTo(deg);
+    } else { readout(s, t); send(`D ${s} ${t}`, 'D'); }
+  }
   function startLoop() { if (!timer) { sendDrive(); timer = setInterval(sendDrive, 80); } }
   function resetStick(tell = true) {
     active = null; clearInterval(timer); timer = null;
     vec = { x: 0, y: 0 }; knob.style.transform = 'translate(-50%,-50%)';
-    pad.classList.remove('grab'); readout(0, 0);
-    if (tell) send('D 0 0', 'D');
+    pad.classList.remove('grab');
+    if (mode === 'car') {
+      $('readout').textContent = '속도 0 핸들 0°';
+      if (tell) { send(`P ${car.drive} 0`, 'D'); steerTo(0); }
+    } else { readout(0, 0); if (tell) send('D 0 0', 'D'); }
   }
 
   pad.addEventListener('pointerdown', e => {
@@ -391,6 +458,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
   const keys = new Set(), ARROWS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
   addEventListener('keydown', e => {
     if (!$('help').hidden) { if (e.key === 'Escape') closeHelp(); return; }
+    if (!$('carSheet').hidden) { if (e.key === 'Escape') closeCar(); return; }
     if (e.target === $('word')) return;
     if (e.key === ' ') { e.preventDefault(); emergency(); return; }
     if (!ARROWS.includes(e.key) || active !== null) return;
@@ -493,6 +561,39 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
   }
   $('showWord').addEventListener('click', () => { wordTimer ? stopWord() : playWord(); });
   $('word').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('word').blur(); if (!wordTimer) playWord(); } });
+
+  const PORTS = ['A', 'B', 'C', 'D', 'E', 'F'];
+  ['carDrive', 'carSteer'].forEach(id => PORTS.forEach(pt => { const o = document.createElement('option'); o.value = o.textContent = pt; $(id).appendChild(o); }));
+  function syncCarForm() {
+    $('carDrive').value = car.drive; $('carSteer').value = car.steer;
+    $('carDriveRev').checked = car.driveRev; $('carSteerRev').checked = car.steerRev;
+    $('carMax').value = car.maxAngle; $('carMaxOut').textContent = car.maxAngle + '°';
+    $('trimOut').textContent = (car.trim > 0 ? '+' : '') + car.trim + '°';
+  }
+  function setMode(m) {
+    if (timer) resetStick();
+    mode = m; saveCar();
+    $('tabTank').setAttribute('aria-selected', m === 'tank');
+    $('tabCar').setAttribute('aria-selected', m === 'car');
+    $('carSetBtn').hidden = m !== 'car';
+    resetStick(false);
+    if (m === 'car' && chr && running) steerTo(0, true);
+  }
+  $('tabTank').addEventListener('click', () => setMode('tank'));
+  $('tabCar').addEventListener('click', () => setMode('car'));
+  function openCar() { syncCarForm(); $('carSheet').hidden = false; $('closeCar').focus(); }
+  function closeCar() { $('carSheet').hidden = true; $('carSetBtn').focus(); }
+  $('carSetBtn').addEventListener('click', openCar);
+  $('closeCar').addEventListener('click', closeCar);
+  $('carDrive').addEventListener('change', e => { send(`P ${car.drive} 0`, 'D'); car.drive = e.target.value; saveCar(); });
+  $('carSteer').addEventListener('change', e => { car.steer = e.target.value; saveCar(); steerTo(0, true); });
+  $('carDriveRev').addEventListener('change', e => { car.driveRev = e.target.checked; saveCar(); });
+  $('carSteerRev').addEventListener('change', e => { car.steerRev = e.target.checked; saveCar(); });
+  $('carMax').addEventListener('input', e => { car.maxAngle = +e.target.value; $('carMaxOut').textContent = car.maxAngle + '°'; saveCar(); });
+  const nudge = d => { car.trim = Math.max(-180, Math.min(180, car.trim + d)); syncCarForm(); saveCar(); steerTo(0, true); };
+  $('trimL').addEventListener('click', () => nudge(car.steerRev ? 3 : -3));
+  $('trimR').addEventListener('click', () => nudge(car.steerRev ? -3 : 3));
+  setMode(mode);
 
   function emergency() {
     resetStick(false); slots.clear(); queue.length = 0; send('S');
