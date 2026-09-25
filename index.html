@@ -96,10 +96,18 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
 .speed{display:flex;align-items:center;gap:10px;font-size:1rem}
 .speed output{min-width:3.2ch;font-variant-numeric:tabular-nums}
 .speed input{flex:1;accent-color:var(--ink);height:28px}
-.btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.btns.three{grid-template-columns:0.8fr 1.3fr 1fr}
-.btns button{padding:11px 4px;font-size:1.1rem;white-space:nowrap}
-.btns .light[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.btns{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.btns button{padding:8px 2px;font-size:.98rem;white-space:nowrap;border-radius:11px;box-shadow:0 3px 0 var(--line)}
+.btns button:active,.btns button.down{box-shadow:0 1px 0 var(--line);transform:translateY(2px)}
+.btns .span2{grid-column:span 2}
+.btns [aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.btns .stop[aria-pressed]{background:var(--stop)}
+.song-list{display:grid;gap:10px}
+.song-list .toy{padding:14px 16px;font-size:1.25rem;text-align:left;display:flex;justify-content:space-between;align-items:center}
+.song-list .toy[aria-current="true"]::after{content:"달릴 때 이 노래";font-size:.85rem;color:var(--muted)}
+.piano{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px;height:min(52vh,420px);margin:6px 0 14px;touch-action:none}
+.key{border:3px solid var(--line);border-radius:10px 10px 14px 14px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:12px;font-size:1.25rem;color:#000;box-shadow:0 5px 0 var(--line);transition:transform .05s,box-shadow .05s;touch-action:none;-webkit-user-select:none;user-select:none}
+.key.down{transform:translateY(4px);box-shadow:0 1px 0 var(--line)}
 .modebar{grid-area:mode;display:flex;gap:10px;align-items:center;justify-content:space-between}
 .seg{display:inline-flex;border:3px solid var(--line);border-radius:12px;overflow:hidden;background:var(--paper)}
 .seg button{border:0;background:transparent;padding:8px 12px;font-size:1.1rem;white-space:nowrap}
@@ -143,7 +151,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
 .mini i{width:7px;height:7px;border-radius:2px;background:color-mix(in srgb,var(--line) 12%,transparent)}
 .mini i.on{background:var(--ink)}
 .stop{
-  font-size:1.25rem;background:var(--stop);color:var(--stop-ink);
+  font-size:1.1rem;background:var(--stop);color:var(--stop-ink);
   border-color:var(--line);letter-spacing:.06em
 }
 
@@ -222,13 +230,31 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
     <div class="btns">
       <button class="toy" id="armUp">팔 올리기</button>
       <button class="toy" id="armDown">팔 내리기</button>
-    </div>
-    <div class="btns three">
-      <button class="toy" id="beep">삐</button>
       <button class="toy light" id="lightBtn" aria-pressed="false">센서 불 켜기</button>
-      <button class="toy stop" id="stopBtn">정지</button>
+      <button class="toy" id="songBtn" aria-pressed="false">노래</button>
+      <button class="toy" id="pianoBtn">건반</button>
+      <button class="toy" id="driveSongBtn" aria-pressed="false">달리며 노래</button>
+      <button class="toy" id="beep">삐</button>
+      <button class="toy stop span2" id="stopBtn">정지</button>
     </div>
   </section>
+</div>
+
+<div class="sheet" id="songSheet" hidden role="dialog" aria-modal="true" aria-labelledby="songTitle">
+  <div class="sheet-inner">
+    <h2 id="songTitle">노래 고르기</h2>
+    <p class="hint" style="margin:-6px 0 14px">누르면 바로 연주해요. 마지막으로 고른 노래가 '달리며 노래'에서도 나와요.</p>
+    <div class="song-list" id="songList"></div>
+    <div class="row"><button class="toy pill" id="closeSong">닫기</button></div>
+  </div>
+</div>
+
+<div class="sheet" id="pianoSheet" hidden role="dialog" aria-modal="true" aria-labelledby="pianoTitle">
+  <div class="sheet-inner">
+    <h2 id="pianoTitle">건반</h2>
+    <div class="piano" id="piano"></div>
+    <div class="row"><button class="toy pill" id="closePiano">닫기</button></div>
+  </div>
 </div>
 
 <div class="sheet" id="testSheet" hidden role="dialog" aria-modal="true" aria-labelledby="testTitle">
@@ -492,8 +518,14 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
       steerTo(deg);
     } else { readout(s, t); send(`D ${s} ${t}`, 'D'); }
   }
-  function startLoop() { if (!timer) { sendDrive(); timer = setInterval(sendDrive, 80); } }
+  function startLoop() {
+    if (!timer) {
+      sendDrive(); timer = setInterval(sendDrive, 80);
+      if (driveSong && chr && running && !songPlaying) { playSong(currentSong, { loop: true, maxNote: 250 }); songByDrive = true; }
+    }
+  }
   function resetStick(tell = true) {
+    if (songByDrive) stopSong();
     active = null; clearInterval(timer); timer = null;
     vec = { x: 0, y: 0 }; knob.style.transform = 'translate(-50%,-50%)';
     pad.classList.remove('grab');
@@ -519,6 +551,8 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
     if (!$('help').hidden) { if (e.key === 'Escape') closeHelp(); return; }
     if (!$('carSheet').hidden) { if (e.key === 'Escape') closeCar(); return; }
     if (!$('testSheet').hidden) { if (e.key === 'Escape') closeTest(); return; }
+    if (!$('songSheet').hidden) { if (e.key === 'Escape') $('songSheet').hidden = true; return; }
+    if (!$('pianoSheet').hidden) { if (e.key === 'Escape') $('pianoSheet').hidden = true; return; }
     if (e.target === $('word')) return;
     if (e.key === ' ') { e.preventDefault(); emergency(); return; }
     if (!ARROWS.includes(e.key) || active !== null) return;
@@ -622,6 +656,85 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
   $('showWord').addEventListener('click', () => { wordTimer ? stopWord() : playWord(); });
   $('word').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('word').blur(); if (!wordTimer) playWord(); } });
 
+  // ── 노래 ──
+  const NOTE_IDX = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
+  function freq(n) {
+    const m = n.match(/^([A-G]#?)(\d)$/);
+    return Math.round(440 * Math.pow(2, ((+m[2] + 1) * 12 + NOTE_IDX[m[1]] - 69) / 12));
+  }
+  // 음이름:박자 (박자 생략 = 1박, R = 쉼표)
+  const SONGS = [
+    { name: '작은별', bpm: 120, notes: 'C5 C5 G5 G5 A5 A5 G5:2 F5 F5 E5 E5 D5 D5 C5:2 G5 G5 F5 F5 E5 E5 D5:2 G5 G5 F5 F5 E5 E5 D5:2 C5 C5 G5 G5 A5 A5 G5:2 F5 F5 E5 E5 D5 D5 C5:2' },
+    { name: '떴다 떴다 비행기', bpm: 120, notes: 'E5 D5 C5 D5 E5 E5 E5:2 D5 D5 D5:2 E5 G5 G5:2 E5 D5 C5 D5 E5 E5 E5:2 D5 D5 E5 D5 C5:2' },
+    { name: '나비야', bpm: 126, notes: 'G5 E5 E5:2 F5 D5 D5:2 C5 D5 E5 F5 G5 G5 G5:2 G5 E5 E5 E5 F5 D5 D5 D5 C5 E5 G5 G5 E5 E5 E5:2 D5 D5 D5 D5 D5 E5 F5:2 E5 E5 E5 E5 E5 F5 G5:2 G5 E5 E5 E5 F5 D5 D5 D5 C5 E5 G5 G5 C5:2' },
+    { name: '생일 축하합니다', bpm: 100, notes: 'G4:0.75 G4:0.25 A4 G4 C5 B4:2 G4:0.75 G4:0.25 A4 G4 D5 C5:2 G4:0.75 G4:0.25 G5 E5 C5 B4 A4:2 F5:0.75 F5:0.25 E5 C5 D5 C5:2' },
+  ];
+  var songTimer = null, songPlaying = false, songByDrive = false, driveSong = false, currentSong = 0;
+  try { const cs = +localStorage.getItem('mr-song'); if (SONGS[cs]) currentSong = cs; } catch (e) {}
+  function updateSongUI() {
+    const own = songPlaying && !songByDrive;
+    $('songBtn').setAttribute('aria-pressed', own); $('songBtn').textContent = own ? '노래 멈춤' : '노래';
+    [...$('songList').children].forEach((b, i) => b.setAttribute('aria-current', i === currentSong));
+  }
+  function stopSong() {
+    clearTimeout(songTimer); songTimer = null; songByDrive = false;
+    if (songPlaying) { songPlaying = false; updateSongUI(); }
+  }
+  function playSong(idx, opt = {}) {
+    stopSong();
+    currentSong = idx; try { localStorage.setItem('mr-song', idx); } catch (e) {}
+    const song = SONGS[idx], beat = 60000 / song.bpm;
+    const seq = song.notes.trim().split(/\s+/).map(t => { const [n, b] = t.split(':'); return { n, beats: b ? +b : 1 }; });
+    let i = 0; songPlaying = true; updateSongUI();
+    const step = () => {
+      if (i >= seq.length) {
+        if (!opt.loop) { stopSong(); return; }
+        i = 0; songTimer = setTimeout(step, beat); return;   // 한 바퀴 끝나면 한 박 쉬기
+      }
+      const { n, beats } = seq[i++], dur = beats * beat;
+      if (n !== 'R') {
+        let ms = Math.round(dur * 0.85);
+        if (opt.maxNote) ms = Math.min(ms, opt.maxNote);   // 달릴 땐 짧게 끊어서 조종이 밀리지 않게
+        send(`B ${freq(n)} ${ms}`);
+      }
+      songTimer = setTimeout(step, dur);
+    };
+    step();
+  }
+  SONGS.forEach((sg, i) => {
+    const b = document.createElement('button'); b.className = 'toy'; b.textContent = sg.name;
+    b.addEventListener('click', () => { if (!needLive()) return; songByDrive = false; playSong(i); $('songSheet').hidden = true; });
+    $('songList').appendChild(b);
+  });
+  $('songBtn').addEventListener('click', () => {
+    if (songPlaying && !songByDrive) { stopSong(); return; }
+    updateSongUI(); $('songSheet').hidden = false; $('closeSong').focus();
+  });
+  $('closeSong').addEventListener('click', () => { $('songSheet').hidden = true; $('songBtn').focus(); });
+  $('driveSongBtn').addEventListener('click', () => {
+    driveSong = !driveSong;
+    $('driveSongBtn').setAttribute('aria-pressed', driveSong);
+    if (!driveSong && songByDrive) stopSong();
+    log(driveSong ? `달릴 때 '${SONGS[currentSong].name}'이(가) 나와요` : '달리며 노래 꺼짐');
+  });
+
+  // ── 건반 ──
+  const KEYS = [['도', 'C5', '#FFB3B3'], ['레', 'D5', '#FFD29E'], ['미', 'E5', '#FFF1A1'], ['파', 'F5', '#C8F0A8'],
+                ['솔', 'G5', '#A8E6E0'], ['라', 'A5', '#AFCBFF'], ['시', 'B5', '#D3B8FF'], ['도', 'C6', '#FFC4E1']];
+  KEYS.forEach(([label, note, color]) => {
+    const k = document.createElement('button');
+    k.className = 'key'; k.textContent = label; k.style.background = color; k.setAttribute('aria-label', label + ' ' + note);
+    k.addEventListener('pointerdown', e => {
+      e.preventDefault(); k.classList.add('down');
+      if (chr && running) send(`B ${freq(note)} 280`); else log('허브 프로그램이 실행 중일 때 소리가 나요');
+    });
+    const up = () => k.classList.remove('down');
+    k.addEventListener('pointerup', up); k.addEventListener('pointercancel', up); k.addEventListener('pointerleave', up);
+    $('piano').appendChild(k);
+  });
+  $('pianoBtn').addEventListener('click', () => { $('pianoSheet').hidden = false; $('closePiano').focus(); });
+  $('closePiano').addEventListener('click', () => { $('pianoSheet').hidden = true; $('pianoBtn').focus(); });
+
   const PORTS = ['A', 'B', 'C', 'D', 'E', 'F'];
   ['carDrive', 'carSteer'].forEach(id => PORTS.forEach(pt => { const o = document.createElement('option'); o.value = o.textContent = pt; $(id).appendChild(o); }));
   function syncCarForm() {
@@ -699,7 +812,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
   $('closeTest').addEventListener('click', closeTest);
 
   function emergency() {
-    resetStick(false); slots.clear(); queue.length = 0; send('S');
+    stopSong(); resetStick(false); slots.clear(); queue.length = 0; send('S');
   }
   $('stopBtn').addEventListener('click', emergency);
   document.addEventListener('visibilitychange', () => { if (document.hidden) emergency(); });
