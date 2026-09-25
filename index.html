@@ -273,9 +273,9 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
     <h2 id="carTitle">자동차 설정</h2>
     <div class="form">
       <label class="field">구동 모터 (바퀴 굴리기) 포트<select id="carDrive"></select></label>
-      <label class="check"><input type="checkbox" id="carDriveRev"> 앞뒤가 반대로 가요</label>
+      <label class="check"><input type="checkbox" id="carDriveRev"> 앞뒤 뒤집기 (위로 밀었는데 뒤로 가면 바꾸기)</label>
       <label class="field">핸들 모터 (방향 꺾기) 포트<select id="carSteer"></select></label>
-      <label class="check"><input type="checkbox" id="carSteerRev"> 좌우가 반대로 꺾여요</label>
+      <label class="check"><input type="checkbox" id="carSteerRev"> 좌우 뒤집기 (오른쪽으로 밀었는데 왼쪽으로 꺾이면 바꾸기)</label>
       <label class="field"><span>핸들 최대 각도 <output id="carMaxOut">35°</output></span><input type="range" id="carMax" min="10" max="180" step="5"></label>
       <div class="field">핸들 가운데 맞추기
         <span class="hint">허브를 연결하고 조종 가능 상태에서, 앞바퀴가 똑바로 설 때까지 눌러 주세요. 한 번 맞추면 기억해요.</span>
@@ -283,7 +283,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
       </div>
     </div>
     <p class="hint" style="margin-top:18px">어느 포트에 모터가 있는지는 ? 화면의 허브 메시지 "찾은 부품"에서 볼 수 있어요.</p>
-    <div class="row"><button class="toy pill" id="closeCar">닫기</button></div>
+    <div class="row"><button class="toy" id="resetCar">처음 설정으로</button><button class="toy pill" id="closeCar">닫기</button></div>
   </div>
 </div>
 
@@ -469,13 +469,15 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
   }
   function readout(s, t) { $('readout').textContent = `앞뒤 ${s} 좌우 ${t}`; }
   // ── 자동차형 ──
-  const CAR_DEFAULT = { drive: 'A', driveRev: false, steer: 'B', steerRev: false, maxAngle: 35, trim: 0 };
+  // 이 차(구동 E, 핸들 F)에 맞춘 기본값
+  const CAR_DEFAULT = { drive: 'E', driveRev: true, steer: 'F', steerRev: false, maxAngle: 90, trim: 0 };
+  const CAR_KEY = 'mr-car-v2';
   let mode = 'tank', car = { ...CAR_DEFAULT }, lastSteer = null;
   try {
     const m = localStorage.getItem('mr-mode'); if (m === 'car' || m === 'tank') mode = m;
-    const c = JSON.parse(localStorage.getItem('mr-car') || 'null'); if (c) car = { ...CAR_DEFAULT, ...c };
+    const c = JSON.parse(localStorage.getItem(CAR_KEY) || 'null'); if (c) car = { ...CAR_DEFAULT, ...c };
   } catch (e) {}
-  function saveCar() { try { localStorage.setItem('mr-car', JSON.stringify(car)); localStorage.setItem('mr-mode', mode); } catch (e) {} }
+  function saveCar() { try { localStorage.setItem(CAR_KEY, JSON.stringify(car)); localStorage.setItem('mr-mode', mode); } catch (e) {} }
   function steerTo(deg, force = false) {
     const t = Math.round(car.trim + (car.steerRev ? -deg : deg));
     if (t === lastSteer && !force) return;
@@ -643,6 +645,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
   function closeCar() { $('carSheet').hidden = true; $('carSetBtn').focus(); }
   $('carSetBtn').addEventListener('click', openCar);
   $('closeCar').addEventListener('click', closeCar);
+  $('resetCar').addEventListener('click', () => { car = { ...CAR_DEFAULT }; saveCar(); syncCarForm(); steerTo(0, true); log('차 설정을 처음 값으로 되돌렸어요'); });
   $('carDrive').addEventListener('change', e => { send(`P ${car.drive} 0`, 'D'); car.drive = e.target.value; saveCar(); });
   $('carSteer').addEventListener('change', e => { car.steer = e.target.value; saveCar(); steerTo(0, true); });
   $('carDriveRev').addEventListener('change', e => { car.driveRev = e.target.checked; saveCar(); });
