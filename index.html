@@ -253,6 +253,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
 <div class="sheet" id="pianoSheet" hidden role="dialog" aria-modal="true" aria-labelledby="pianoTitle">
   <div class="sheet-inner">
     <h2 id="pianoTitle">건반</h2>
+    <p class="status" style="margin:-8px 0 10px"><span class="dot" id="pianoDot" data-s="off"></span><span id="pianoStatus">연결 안 됨</span></p>
     <p class="piano-label">높은 음</p>
     <div class="piano" id="pianoHigh"></div>
     <p class="piano-label">낮은 음</p>
@@ -358,7 +359,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
   const enc = new TextEncoder(), dec = new TextDecoder();
   const hasBt = !!(navigator.bluetooth && navigator.bluetooth.requestDevice);
 
-  let device = null, chr = null, running = false, battWarned = false;
+  let device = null, chr = null, running = false, battWarned = false, autoStartTried = false;
   const slots = new Map();   // 최신 값만 보내면 되는 명령 (주행, 팔)
   const queue = [];          // 한 번씩 꼭 보내야 하는 명령
   let busy = false;
@@ -379,6 +380,8 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
     else if (running) { d.dataset.s = 'on'; s.textContent = '조종 가능'; $('connectBtn').textContent = '연결 끊기'; $('startBtn').hidden = true; }
     else { d.dataset.s = 'wait'; s.textContent = '허브 프로그램 대기 중'; $('connectBtn').textContent = '연결 끊기'; $('startBtn').hidden = false; }
     document.body.classList.toggle('live', !!chr && running);
+    const pd = document.getElementById('pianoDot');
+    if (pd) { pd.dataset.s = d.dataset.s; document.getElementById('pianoStatus').textContent = s.textContent; }
     const cc = document.getElementById('ckConn'), cr = document.getElementById('ckRun');
     if (cc) { cc.className = chr ? 'ok' : 'no'; cr.className = chr && running ? 'ok' : 'no';
       cr.textContent = chr && running ? '허브 프로그램 실행 중' : '허브 프로그램이 실행 중이 아니에요 (허브 가운데 버튼을 누르거나 시작 버튼)'; }
@@ -421,7 +424,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
       const c = await svc.getCharacteristic(CHR);
       c.addEventListener('characteristicvaluechanged', onNotify);
       await c.startNotifications();
-      chr = c;
+      chr = c; autoStartTried = false;
       log((device.name || '허브') + ' 연결됨');
       setStatus();
     } catch (e) {
@@ -443,6 +446,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
     if (type === 0x00 && v.byteLength >= 5) {           // 상태 보고
       const flags = v.getUint32(1, true);
       const r = !!(flags & (1 << 6));
+      if (!r && !autoStartTried) { autoStartTried = true; log('허브 프로그램을 자동으로 시작할게요'); setTimeout(startProgram, 300); }
       if (r !== running) { running = r; if (!r) resetStick(false); else if (mode === 'car') steerTo(0, true); setStatus(); log(r ? '허브 프로그램 실행 중' : '허브 프로그램 멈춤'); }
       if ((flags & 1) && !battWarned) { battWarned = true; log('허브 배터리가 부족해요'); }
     } else if (type === 0x01) {                          // 허브 print 출력
@@ -723,6 +727,16 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
   });
 
   // ── 건반 ──
+  // 허브는 소리를 내는 동안 다른 명령을 못 읽어요. 건반을 빠르게 연타하면 명령이 쌓여 넘치므로,
+  // 앞 음이 끝날 때까지 기다렸다가 마지막으로 누른 음만 보내요.
+  const KEY_MS = 200;
+  let noteFreeAt = 0, noteTimer = null;
+  function playKey(f) {
+    const go = () => { noteTimer = null; send(`B ${f} ${KEY_MS}`); noteFreeAt = performance.now() + KEY_MS + 40; };
+    const wait = noteFreeAt - performance.now();
+    clearTimeout(noteTimer);
+    if (wait <= 0) go(); else noteTimer = setTimeout(go, wait);
+  }
   const KEY_NAMES = ['도', '레', '미', '파', '솔', '라', '시', '도'];
   const KEY_COLORS = ['#FFB3B3', '#FFD29E', '#FFF1A1', '#C8F0A8', '#A8E6E0', '#AFCBFF', '#D3B8FF', '#FFC4E1'];
   const scale = o => ['C', 'D', 'E', 'F', 'G', 'A', 'B'].map(n => n + o).concat('C' + (o + 1));
@@ -732,7 +746,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
     k.className = 'key'; k.textContent = label; k.style.background = color; k.setAttribute('aria-label', label + ' ' + note);
     k.addEventListener('pointerdown', e => {
       e.preventDefault(); k.classList.add('down');
-      if (chr && running) send(`B ${freq(note)} 280`); else log('허브 프로그램이 실행 중일 때 소리가 나요');
+      if (chr && running) playKey(freq(note)); else log('허브 프로그램이 실행 중일 때 소리가 나요');
     });
     const up = () => k.classList.remove('down');
     k.addEventListener('pointerup', up); k.addEventListener('pointercancel', up); k.addEventListener('pointerleave', up);
@@ -818,7 +832,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
   $('closeTest').addEventListener('click', closeTest);
 
   function emergency() {
-    stopSong(); resetStick(false); slots.clear(); queue.length = 0; send('S');
+    clearTimeout(noteTimer); stopSong(); resetStick(false); slots.clear(); queue.length = 0; send('S');
   }
   $('stopBtn').addEventListener('click', emergency);
   document.addEventListener('visibilitychange', () => { if (document.hidden) emergency(); });
