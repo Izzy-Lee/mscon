@@ -120,12 +120,33 @@ body:not(.live) .stick-area .pad,body:not(.live) .dpad,body:not(.live) .controls
 .btns [aria-pressed="true"]{background:var(--ink);color:var(--bg)}
 .btns .stop[aria-pressed]{background:var(--stop)}
 .song-list{display:grid;gap:10px}
-.song-list .toy{padding:14px 16px;font-size:1.25rem;text-align:left;display:flex;justify-content:space-between;align-items:center}
-.song-list .toy[aria-current="true"]::after{content:"달릴 때 이 노래";font-size:.85rem;color:var(--muted)}
-.piano{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px;height:min(27vh,220px);margin:4px 0 12px;touch-action:none}
+.song-list .song-play{padding:14px 16px;font-size:1.25rem;text-align:left;display:flex;justify-content:space-between;align-items:center}
+.song-list .song-play[aria-current="true"]::after{content:"달릴 때 이 노래";font-size:.85rem;color:var(--muted)}
+.piano{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px;height:min(24vh,210px);margin:4px 0 12px;touch-action:none}
 .piano-label{margin:0;font-size:1rem;color:var(--muted)}
+.recbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 10px}
+.recbar .toy,.recsave .toy{padding:8px 12px;font-size:1.05rem;white-space:nowrap}
+.recbar .hint{flex:1 1 140px;margin:0}
+#recBtn[aria-pressed="true"]{background:var(--stop);color:#fff;border-color:var(--line)}
+.toy:disabled{opacity:.4}
+.recsave{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;margin:0 0 12px}
+.recsave[hidden]{display:none}
+.recsave input{min-width:0;font:inherit;font-size:1.1rem;padding:8px 10px;border:3px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);-webkit-user-select:text;user-select:text}
+.song-item{display:flex;gap:8px}
+.song-item .song-play{flex:1}
+.song-item .song-del{padding:0 14px;font-size:1rem;white-space:nowrap}
 .key{border:3px solid var(--line);border-radius:10px 10px 14px 14px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:12px;font-size:1.25rem;color:#000;box-shadow:0 5px 0 var(--line);transition:transform .05s,box-shadow .05s;touch-action:none;-webkit-user-select:none;user-select:none}
 .key.down{transform:translateY(4px);box-shadow:0 1px 0 var(--line)}
+.piano{position:relative}
+.key.black{
+  --w:calc((100% - 35px) / 8);
+  position:absolute;top:0;z-index:1;height:58%;
+  width:calc(var(--w) * .66);
+  left:calc(var(--pos) * (var(--w) + 5px) - 2.5px - var(--w) * .33);
+  background:#1E1D22;color:#fff;border-color:#000;border-radius:0 0 9px 9px;
+  font-size:.78rem;padding:0 0 8px;letter-spacing:-.04em;box-shadow:0 4px 0 #000;
+}
+.key.black.down{background:#3A3940;transform:translateY(3px);box-shadow:0 1px 0 #000}
 .modebar{grid-area:mode;display:flex;gap:10px;align-items:center;justify-content:space-between}
 .seg{display:inline-flex;border:3px solid var(--line);border-radius:12px;overflow:hidden;background:var(--paper)}
 .seg button{border:0;background:transparent;padding:8px 12px;font-size:1.1rem;white-space:nowrap}
@@ -270,7 +291,7 @@ body:not(.live) .stick-area .pad,body:not(.live) .dpad,body:not(.live) .controls
 <div class="sheet" id="songSheet" hidden role="dialog" aria-modal="true" aria-labelledby="songTitle">
   <div class="sheet-inner">
     <h2 id="songTitle">노래 고르기</h2>
-    <p class="hint" style="margin:-6px 0 14px">누르면 바로 연주해요. 마지막으로 고른 노래가 '달리며 노래'에서도 나와요.</p>
+    <p class="hint" style="margin:-6px 0 14px">누르면 바로 연주해요. 마지막으로 고른 노래가 '달리며 노래'에서도 나와요. 건반 화면에서 녹음한 곡은 여기 '내 노래'로 추가돼요.</p>
     <div class="song-list" id="songList"></div>
     <div class="row"><button class="toy pill" id="closeSong">닫기</button></div>
   </div>
@@ -280,6 +301,16 @@ body:not(.live) .stick-area .pad,body:not(.live) .dpad,body:not(.live) .controls
   <div class="sheet-inner">
     <h2 id="pianoTitle">건반</h2>
     <p class="status" style="margin:-8px 0 10px"><span class="dot" id="pianoDot" data-s="off"></span><span id="pianoStatus">연결 안 됨</span></p>
+    <div class="recbar">
+      <button class="toy" id="recBtn" aria-pressed="false">● 녹음</button>
+      <button class="toy" id="recPlay" disabled>▶ 들어보기</button>
+      <span class="hint" id="recInfo">녹음을 누르고 건반을 치면 박자까지 그대로 저장돼요</span>
+    </div>
+    <div class="recsave" id="recSave" hidden>
+      <input id="recName" type="text" maxlength="20" placeholder="내 노래 1" aria-label="노래 이름">
+      <button class="toy pill" id="recSaveBtn">목록에 저장</button>
+      <button class="toy" id="recDiscard">지우기</button>
+    </div>
     <p class="piano-label">높은 음</p>
     <div class="piano" id="pianoHigh"></div>
     <p class="piano-label">낮은 음</p>
@@ -723,42 +754,83 @@ body:not(.live) .stick-area .pad,body:not(.live) .dpad,body:not(.live) .controls
     { name: '생일 축하합니다', bpm: 100, notes: 'G4:0.75 G4:0.25 A4 G4 C5 B4:2 G4:0.75 G4:0.25 A4 G4 D5 C5:2 G4:0.75 G4:0.25 G5 E5 C5 B4 A4:2 F5:0.75 F5:0.25 E5 C5 D5 C5:2' },
   ];
   var songTimer = null, songPlaying = false, songByDrive = false, driveSong = false, currentSong = 0;
-  try { const cs = +localStorage.getItem('mr-song'); if (SONGS[cs]) currentSong = cs; } catch (e) {}
+  let mySongs = [];
+  try { mySongs = JSON.parse(localStorage.getItem('mr-mysongs') || '[]'); if (!Array.isArray(mySongs)) mySongs = []; } catch (e) { mySongs = []; }
+  function saveMySongs() { try { localStorage.setItem('mr-mysongs', JSON.stringify(mySongs)); } catch (e) { log('저장 공간이 부족해서 저장하지 못했어요'); } }
+  const allSongs = () => SONGS.concat(mySongs);
+  try { const cs = +localStorage.getItem('mr-song'); if (allSongs()[cs]) currentSong = cs; } catch (e) {}
+
+  // 노래를 [{f 주파수, t 시작ms, d 길이ms}] 로 바꾸기
+  function toEvents(song) {
+    if (song.events) {
+      const ev = song.events.map((e, i, a) => ({ f: e.f, t: e.t, d: i + 1 < a.length ? a[i + 1].t - e.t : 450 }));
+      return { ev, total: ev.length ? ev[ev.length - 1].t + 450 : 0 };
+    }
+    const beat = 60000 / song.bpm; let t = 0; const ev = [];
+    song.notes.trim().split(/\s+/).forEach(tok => {
+      const [n, b] = tok.split(':'); const dur = (b ? +b : 1) * beat;
+      if (n !== 'R') ev.push({ f: freq(n), t: Math.round(t), d: Math.round(dur) });
+      t += dur;
+    });
+    return { ev, total: Math.round(t) };
+  }
   function updateSongUI() {
     const own = songPlaying && !songByDrive;
     $('songBtn').setAttribute('aria-pressed', own); $('songBtn').textContent = own ? '노래 멈춤' : '노래';
-    [...$('songList').children].forEach((b, i) => b.setAttribute('aria-current', i === currentSong));
+    document.querySelectorAll('#songList .song-play').forEach((b, i) => b.setAttribute('aria-current', i === currentSong));
   }
   function stopSong() {
     clearTimeout(songTimer); songTimer = null; songByDrive = false;
-    if (songPlaying) { songPlaying = false; updateSongUI(); }
+    if (songPlaying) { songPlaying = false; updateSongUI(); if (typeof recUI === 'function') recUI(); }
+  }
+  function playEvents({ ev, total }, opt = {}) {
+    stopSong();
+    if (!ev.length) return;
+    songPlaying = true; updateSongUI();
+    let i = 0;
+    const tick = () => {
+      const e = ev[i];
+      let ms = Math.max(60, Math.min(1000, Math.round(e.d * 0.85)));
+      if (opt.maxNote) ms = Math.min(ms, opt.maxNote);   // 달릴 땐 짧게 끊어서 조종이 밀리지 않게
+      send(`B ${e.f} ${ms}`);
+      i++;
+      if (i < ev.length) songTimer = setTimeout(tick, ev[i].t - e.t);
+      else songTimer = setTimeout(() => {
+        if (opt.loop) { i = 0; songTimer = setTimeout(tick, 500); } else stopSong();
+      }, Math.max(0, total - e.t));
+    };
+    songTimer = setTimeout(tick, ev[0].t);
   }
   function playSong(idx, opt = {}) {
-    stopSong();
+    const song = allSongs()[idx]; if (!song) return;
     currentSong = idx; try { localStorage.setItem('mr-song', idx); } catch (e) {}
-    const song = SONGS[idx], beat = 60000 / song.bpm;
-    const seq = song.notes.trim().split(/\s+/).map(t => { const [n, b] = t.split(':'); return { n, beats: b ? +b : 1 }; });
-    let i = 0; songPlaying = true; updateSongUI();
-    const step = () => {
-      if (i >= seq.length) {
-        if (!opt.loop) { stopSong(); return; }
-        i = 0; songTimer = setTimeout(step, beat); return;   // 한 바퀴 끝나면 한 박 쉬기
-      }
-      const { n, beats } = seq[i++], dur = beats * beat;
-      if (n !== 'R') {
-        let ms = Math.round(dur * 0.85);
-        if (opt.maxNote) ms = Math.min(ms, opt.maxNote);   // 달릴 땐 짧게 끊어서 조종이 밀리지 않게
-        send(`B ${freq(n)} ${ms}`);
-      }
-      songTimer = setTimeout(step, dur);
-    };
-    step();
+    playEvents(toEvents(song), opt);
   }
-  SONGS.forEach((sg, i) => {
-    const b = document.createElement('button'); b.className = 'toy'; b.textContent = sg.name;
-    b.addEventListener('click', () => { if (!needLive()) return; songByDrive = false; playSong(i); $('songSheet').hidden = true; });
-    $('songList').appendChild(b);
-  });
+  function renderSongList() {
+    const box = $('songList'); box.textContent = '';
+    allSongs().forEach((sg, i) => {
+      const row = document.createElement('div'); row.className = 'song-item';
+      const b = document.createElement('button'); b.className = 'toy song-play'; b.textContent = sg.name;
+      b.addEventListener('click', () => { if (!needLive()) return; songByDrive = false; playSong(i); $('songSheet').hidden = true; });
+      row.appendChild(b);
+      if (i >= SONGS.length) {
+        const del = document.createElement('button'); del.className = 'toy song-del'; del.textContent = '지우기';
+        let armed = null;
+        del.addEventListener('click', () => {
+          if (!armed) { del.textContent = '정말?'; armed = setTimeout(() => { armed = null; del.textContent = '지우기'; }, 2500); return; }
+          clearTimeout(armed);
+          if (songPlaying) stopSong();
+          mySongs.splice(i - SONGS.length, 1); saveMySongs();
+          if (currentSong >= allSongs().length) currentSong = 0;
+          renderSongList(); log(`'${sg.name}'을(를) 지웠어요`);
+        });
+        row.appendChild(del);
+      }
+      box.appendChild(row);
+    });
+    updateSongUI();
+  }
+  renderSongList();
   $('songBtn').addEventListener('click', () => {
     if (songPlaying && !songByDrive) { stopSong(); return; }
     updateSongUI(); $('songSheet').hidden = false; $('closeSong').focus();
@@ -768,7 +840,60 @@ body:not(.live) .stick-area .pad,body:not(.live) .dpad,body:not(.live) .controls
     driveSong = !driveSong;
     $('driveSongBtn').setAttribute('aria-pressed', driveSong);
     if (!driveSong && songByDrive) stopSong();
-    log(driveSong ? `달릴 때 '${SONGS[currentSong].name}'이(가) 나와요` : '달리며 노래 꺼짐');
+    log(driveSong ? `달릴 때 '${allSongs()[currentSong].name}'이(가) 나와요` : '달리며 노래 꺼짐');
+  });
+
+  // ── 녹음 ──
+  const REC_MAX_NOTES = 300, REC_MAX_MS = 180000;
+  const rec = { on: false, start: 0, events: [], timer: null };
+  const mmss = ms => { const s = Math.floor(ms / 1000); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+  function recUI() {
+    $('recBtn').setAttribute('aria-pressed', rec.on);
+    $('recBtn').textContent = rec.on ? '■ 녹음 끝' : '● 녹음';
+    const has = !rec.on && rec.events.length > 0;
+    $('recPlay').disabled = !has;
+    $('recPlay').textContent = songPlaying && !songByDrive && has ? '■ 멈춤' : '▶ 들어보기';
+    $('recSave').hidden = !has;
+    if (rec.on) {
+      const len = rec.events.length ? performance.now() - rec.start : 0;
+      $('recInfo').textContent = rec.events.length ? `녹음 중 ${mmss(len)}, ${rec.events.length}음` : '녹음 중이에요. 건반을 쳐 보세요';
+    } else if (has) {
+      $('recInfo').textContent = `${rec.events.length}음, ${mmss(rec.events[rec.events.length - 1].t + 450)}`;
+    }
+  }
+  function recordNote(f) {
+    if (!rec.on) return;
+    const now = performance.now();
+    if (!rec.events.length) rec.start = now;
+    rec.events.push({ f, t: Math.round(now - rec.start) });
+    if (rec.events.length >= REC_MAX_NOTES || now - rec.start >= REC_MAX_MS) { stopRec(); log('녹음은 최대 300음, 3분까지예요'); }
+  }
+  function startRec() {
+    stopSong(); rec.on = true; rec.events = []; clearInterval(rec.timer);
+    rec.timer = setInterval(recUI, 250); recUI();
+  }
+  function stopRec() {
+    rec.on = false; clearInterval(rec.timer);
+    if (rec.events.length) $('recName').value = '';
+    $('recName').placeholder = `내 노래 ${mySongs.length + 1}`;
+    recUI();
+    if (!rec.events.length) $('recInfo').textContent = '녹음된 음이 없어요. 녹음을 누르고 건반을 쳐 보세요';
+  }
+  $('recBtn').addEventListener('click', () => { rec.on ? stopRec() : startRec(); });
+  $('recPlay').addEventListener('click', () => {
+    if (songPlaying && !songByDrive) { stopSong(); recUI(); return; }
+    if (!needLive()) return;
+    songByDrive = false; playEvents(toEvents({ events: rec.events })); recUI();
+  });
+  $('recSaveBtn').addEventListener('click', () => {
+    const name = ($('recName').value.trim() || $('recName').placeholder).slice(0, 20);
+    mySongs.push({ name, events: rec.events }); saveMySongs(); renderSongList();
+    rec.events = []; recUI();
+    $('recInfo').textContent = `'${name}'을(를) 노래 목록에 저장했어요`;
+  });
+  $('recDiscard').addEventListener('click', () => {
+    rec.events = []; stopSong(); recUI();
+    $('recInfo').textContent = '녹음을 지웠어요';
   });
 
   // ── 건반 ──
@@ -785,20 +910,31 @@ body:not(.live) .stick-area .pad,body:not(.live) .dpad,body:not(.live) .controls
   const KEY_NAMES = ['도', '레', '미', '파', '솔', '라', '시', '도'];
   const KEY_COLORS = ['#FFB3B3', '#FFD29E', '#FFF1A1', '#C8F0A8', '#A8E6E0', '#AFCBFF', '#D3B8FF', '#FFC4E1'];
   const scale = o => ['C', 'D', 'E', 'F', 'G', 'A', 'B'].map(n => n + o).concat('C' + (o + 1));
-  [[5, 'pianoHigh'], [4, 'pianoLow']].forEach(([oct, box]) => scale(oct).forEach((note, i) => {
-    const label = KEY_NAMES[i], color = KEY_COLORS[i];
+  function makeKey(note, label, cls, color) {
     const k = document.createElement('button');
-    k.className = 'key'; k.textContent = label; k.style.background = color; k.setAttribute('aria-label', label + ' ' + note);
+    k.className = cls; k.textContent = label; if (color) k.style.background = color;
+    k.setAttribute('aria-label', label + ' ' + note);
     k.addEventListener('pointerdown', e => {
-      e.preventDefault(); k.classList.add('down');
-      if (chr && running) playKey(freq(note)); else log('허브 프로그램이 실행 중일 때 소리가 나요');
+      e.preventDefault(); e.stopPropagation(); k.classList.add('down');
+      recordNote(freq(note));
+      if (chr && running) playKey(freq(note)); else if (!rec.on) log('허브 프로그램이 실행 중일 때 소리가 나요');
     });
     const up = () => k.classList.remove('down');
     k.addEventListener('pointerup', up); k.addEventListener('pointercancel', up); k.addEventListener('pointerleave', up);
-    $(box).appendChild(k);
-  }));
+    return k;
+  }
+  // 검은 건반: 흰 건반 사이 경계(도-레, 레-미, 파-솔, 솔-라, 라-시)에 반음 올린 음
+  const BLACKS = [[1, 'C#', '레♭'], [2, 'D#', '미♭'], [4, 'F#', '솔♭'], [5, 'G#', '라♭'], [6, 'A#', '시♭']];
+  [[5, 'pianoHigh'], [4, 'pianoLow']].forEach(([oct, box]) => {
+    scale(oct).forEach((note, i) => $(box).appendChild(makeKey(note, KEY_NAMES[i], 'key', KEY_COLORS[i])));
+    BLACKS.forEach(([pos, n, label]) => {
+      const bk = makeKey(n + oct, label, 'key black');
+      bk.style.setProperty('--pos', pos);
+      $(box).appendChild(bk);
+    });
+  });
   $('pianoBtn').addEventListener('click', () => { $('pianoSheet').hidden = false; $('closePiano').focus(); });
-  $('closePiano').addEventListener('click', () => { $('pianoSheet').hidden = true; $('pianoBtn').focus(); });
+  $('closePiano').addEventListener('click', () => { if (rec.on) stopRec(); $('pianoSheet').hidden = true; $('pianoBtn').focus(); });
 
   const PORTS = ['A', 'B', 'C', 'D', 'E', 'F'];
   ['carDrive', 'carSteer'].forEach(id => PORTS.forEach(pt => { const o = document.createElement('option'); o.value = o.textContent = pt; $(id).appendChild(o); }));
