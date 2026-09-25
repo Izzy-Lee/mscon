@@ -105,7 +105,8 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
 .song-list{display:grid;gap:10px}
 .song-list .toy{padding:14px 16px;font-size:1.25rem;text-align:left;display:flex;justify-content:space-between;align-items:center}
 .song-list .toy[aria-current="true"]::after{content:"달릴 때 이 노래";font-size:.85rem;color:var(--muted)}
-.piano{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px;height:min(52vh,420px);margin:6px 0 14px;touch-action:none}
+.piano{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px;height:min(27vh,220px);margin:4px 0 12px;touch-action:none}
+.piano-label{margin:0;font-size:1rem;color:var(--muted)}
 .key{border:3px solid var(--line);border-radius:10px 10px 14px 14px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:12px;font-size:1.25rem;color:#000;box-shadow:0 5px 0 var(--line);transition:transform .05s,box-shadow .05s;touch-action:none;-webkit-user-select:none;user-select:none}
 .key.down{transform:translateY(4px);box-shadow:0 1px 0 var(--line)}
 .modebar{grid-area:mode;display:flex;gap:10px;align-items:center;justify-content:space-between}
@@ -252,7 +253,10 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
 <div class="sheet" id="pianoSheet" hidden role="dialog" aria-modal="true" aria-labelledby="pianoTitle">
   <div class="sheet-inner">
     <h2 id="pianoTitle">건반</h2>
-    <div class="piano" id="piano"></div>
+    <p class="piano-label">높은 음</p>
+    <div class="piano" id="pianoHigh"></div>
+    <p class="piano-label">낮은 음</p>
+    <div class="piano" id="pianoLow"></div>
     <div class="row"><button class="toy pill" id="closePiano">닫기</button></div>
   </div>
 </div>
@@ -719,9 +723,11 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
   });
 
   // ── 건반 ──
-  const KEYS = [['도', 'C5', '#FFB3B3'], ['레', 'D5', '#FFD29E'], ['미', 'E5', '#FFF1A1'], ['파', 'F5', '#C8F0A8'],
-                ['솔', 'G5', '#A8E6E0'], ['라', 'A5', '#AFCBFF'], ['시', 'B5', '#D3B8FF'], ['도', 'C6', '#FFC4E1']];
-  KEYS.forEach(([label, note, color]) => {
+  const KEY_NAMES = ['도', '레', '미', '파', '솔', '라', '시', '도'];
+  const KEY_COLORS = ['#FFB3B3', '#FFD29E', '#FFF1A1', '#C8F0A8', '#A8E6E0', '#AFCBFF', '#D3B8FF', '#FFC4E1'];
+  const scale = o => ['C', 'D', 'E', 'F', 'G', 'A', 'B'].map(n => n + o).concat('C' + (o + 1));
+  [[5, 'pianoHigh'], [4, 'pianoLow']].forEach(([oct, box]) => scale(oct).forEach((note, i) => {
+    const label = KEY_NAMES[i], color = KEY_COLORS[i];
     const k = document.createElement('button');
     k.className = 'key'; k.textContent = label; k.style.background = color; k.setAttribute('aria-label', label + ' ' + note);
     k.addEventListener('pointerdown', e => {
@@ -730,8 +736,8 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
     });
     const up = () => k.classList.remove('down');
     k.addEventListener('pointerup', up); k.addEventListener('pointercancel', up); k.addEventListener('pointerleave', up);
-    $('piano').appendChild(k);
-  });
+    $(box).appendChild(k);
+  }));
   $('pianoBtn').addEventListener('click', () => { $('pianoSheet').hidden = false; $('closePiano').focus(); });
   $('closePiano').addEventListener('click', () => { $('pianoSheet').hidden = true; $('pianoBtn').focus(); });
 
