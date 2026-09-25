@@ -470,8 +470,8 @@ body:not(.live) .stick-area .pad,body:not(.live) .controls .btns button:not(.sto
   function readout(s, t) { $('readout').textContent = `앞뒤 ${s} 좌우 ${t}`; }
   // ── 자동차형 ──
   // 이 차(구동 E, 핸들 F)에 맞춘 기본값
-  const CAR_DEFAULT = { drive: 'E', driveRev: true, steer: 'F', steerRev: false, maxAngle: 90, trim: 0 };
-  const CAR_KEY = 'mr-car-v2';
+  const CAR_DEFAULT = { drive: 'E', driveRev: true, steer: 'F', steerRev: true, maxAngle: 90, trim: 0 };
+  const CAR_KEY = 'mr-car-v3';
   let mode = 'tank', car = { ...CAR_DEFAULT }, lastSteer = null;
   try {
     const m = localStorage.getItem('mr-mode'); if (m === 'car' || m === 'tank') mode = m;
